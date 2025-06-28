@@ -406,20 +406,37 @@ class UIManager {
     updateUnitList() {
         const container = document.getElementById('unit-list');
         container.innerHTML = '';
-        
+        let a_max = 0
+        let h_max = 0
+        let s_max = 0
+        let d_max = 0
+        this.gameManager.unitSystem.units.forEach((unit, index) => {
+            let stats = this.gameManager.unitSystem.getEffectiveStats(unit);
+            a_max = Math.max(Math.round(stats.attack), a_max)
+            h_max = Math.max(Math.round(stats.health), h_max)
+            s_max = Math.max(stats.speed.toFixed(1), s_max)
+            d_max = Math.max(Math.round(stats.dexterity), d_max)
+        })
+
+
         this.gameManager.unitSystem.units.forEach((unit, index) => {
             const unitCard = document.createElement('div');
             unitCard.className = 'unit-card';
             unitCard.onclick = () => this.openEditor(index);
             
             const stats = this.gameManager.unitSystem.getEffectiveStats(unit);
+            let a_chart = .9 * Math.round(stats.attack) / a_max + .1
+            let h_chart = .9 * Math.round(stats.health) / h_max + .1
+            let s_chart = .9 * stats.speed.toFixed(1)/ s_max + .1
+            let d_chart = .9 * Math.round(stats.dexterity) / d_max + .1
+
             unitCard.innerHTML = `
                 <div class="unit-name">${unit.name}</div>
                 <div class="unit-stats">
-                    <span>🗡 ${Math.round(stats.attack)}</span>
-                    <span>❤️ ${Math.round(stats.health)}</span>
-                    <span>💨 ${stats.speed.toFixed(1)}</span>
-                    <span>🎯 ${Math.round(stats.dexterity)}</span>
+                    <span class = 'a_chart' style = 'width : ${a_chart * 100}%'>🗡 ${Math.round(stats.attack)}</span>
+                    <span class = 'h_chart' style = 'width : ${h_chart * 100}%'>❤️ ${Math.round(stats.health)}</span>
+                    <span class = 's_chart' style = 'width : ${s_chart * 100}%'>💨 ${stats.speed.toFixed(1)}</span>
+                    <span class = 'd_chart' style = 'width : ${d_chart * 100}%'>🎯 ${Math.round(stats.dexterity)}</span>
                 </div>
             `;
             

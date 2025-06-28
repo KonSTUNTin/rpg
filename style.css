@@ -65,6 +65,8 @@ h1, h2 {
     display: flex;
     justify-content: space-between;
     font-size: 14px;
+    flex-flow: column;
+    align-items: start;
 }
 
 .controls {
@@ -205,6 +207,20 @@ h1, h2 {
     margin-bottom: 30px;
     text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
 }
+
+span.a_chart {
+    background-color: #c59f21;
+}
+
+span.h_chart {
+    background-color: red;
+}
+
+span.s_chart {
+    background-color: #46c32d;
+}
+
+span.d_chart {background-color: #7777ec;}
 
 /* Responsive */
 @media (max-width: 768px) {
