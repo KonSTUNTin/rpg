@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tactical Card Battle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen active">
+        <div class="container">
+            <h1>🎯 Tactical Card Battle</h1>
+            <h2>Комната: <span id="room-count">0</span></h2>
+            
+            <div id="unit-list" class="unit-grid"></div>
+            
+            <div class="controls">
+                <button class="btn" onclick="gameManager.ui.startBattle()">⚔️ Начать Бой</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Editor Screen -->
+    <div id="card-editor" class="screen">
+        <div class="container">
+            <h2 id="editor-title">Редактор Юнита</h2>
+            
+            <div class="editor-container">
+                <div class="editor-section">
+                    <h3>Карты Юнита</h3>
+                    <div id="card-columns" class="card-columns">
+                        <div class="column" data-stat="attack"></div>
+                        <div class="column" data-stat="health"></div>
+                        <div class="column" data-stat="speed"></div>
+                        <div class="column" data-stat="dexterity"></div>
+                    </div>
+                    
+                    <div id="combo-status" class="combo-status"></div>
+                </div>
+                
+                <div class="editor-section">
+                    <h3>Колода Карт</h3>
+                    <div id="card-pool" class="card-pool"></div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="gameManager.ui.saveEdits()">💾 Сохранить</button>
+                <button class="btn" onclick="gameManager.ui.closeEditor()">❌ Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Battle Screen -->
+    <div id="battle-screen" class="screen">
+        <div class="container">
+            <div class="battle-ui">
+                <h2>⚔️ Битва</h2>
+                <div class="room-counter">Комната: <span id="battle-room-count">0</span></div>
+            </div>
+            
+            <canvas id="game-canvas" width="800" height="600"></canvas>
+        </div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen" class="screen">
+        <div class="container">
+            <div class="result-container">
+                <div id="result-message" class="result-message"></div>
+                
+                <div class="controls">
+                    <button id="next-btn" class="btn" onclick="gameManager.ui.nextBattle()">➡️ Следующая Комната</button>
+                    <button id="restart-btn" class="btn" onclick="gameManager.ui.restartGame()">🔄 Начать Сначала</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
