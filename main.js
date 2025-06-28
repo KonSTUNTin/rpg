@@ -17,6 +17,18 @@ const CONFIG = {
         deckSize: 25
     }
 };
+const COMBO_MULTIPLIERS = {
+    'Старшая Карта': 1.0,
+    'Пара': 1.1,
+    'Две Пары': 1.2,
+    'Тройка': 1.3,
+    'Стрит': 1.4,
+    'Флеш': 1.5,
+    'Фулл Хаус': 1.6,
+    'Каре': 1.7,
+    'Стрит Флеш': 1.8,
+    'Роял Флеш': 2.0
+};
 
 const CARD_DATA = {
     ranks: { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' },
@@ -303,8 +315,20 @@ class UnitSystem {
                 }
             }
         }
+    
+        // Подсчёт общей комбинации и применение коэффициента
+        const allCards = this.getAllUnitCards(unit);
+        const comboInfo = PokerValidator.isValidHand(allCards);
+        const multiplier = COMBO_MULTIPLIERS[comboInfo.combo] || 1.0;
+    
+        stats.attack *= multiplier;
+        stats.health *= multiplier;
+        stats.speed *= multiplier;
+        stats.dexterity *= multiplier;
+    
         return stats;
     }
+    
 
     getAllUnitCards(unit) {
         let allCards = [];
@@ -522,7 +546,8 @@ class UIManager {
         
         //let message = statInfo.join('<br>') + '<br><br>';
         let message = `<strong>Общая комбинация: ${result.combo}</strong><br>`;
-        message += `Всего карт: ${allCards.length}/5`;
+        message += `<br>Множитель характеристики: x${COMBO_MULTIPLIERS[result.combo] || 1.0}`;
+        message += `<br>Всего карт: ${allCards.length}/5 `;
         
         statusDiv.innerHTML = message;
         statusDiv.className = result.valid ? 'combo-status combo-valid' : 'combo-status combo-invalid';
