@@ -1,83 +1,42 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tactical Card Battle</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Игра с канвасом</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-flow: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 2px solid #333;
+        }
+        div#actions {
+            display: flex;
+            flex-flow: column;
+        }
+    </style>
 </head>
 <body>
-    <!-- Setup Screen -->
-    <div id="setup-screen" class="screen active">
-        <div class="container">
-            <h1>🎯 Tactical Card Battle</h1>
-            <h2>Комната: <span id="room-count">0</span></h2>
-            
-            <div id="unit-list" class="unit-grid"></div>
-            
-            <div class="controls">
-                <button class="btn" onclick="gameManager.ui.startBattle()">⚔️ Начать Бой</button>
-            </div>
+    <button id="spellbookButton">📘 Открыть гримуар</button>
+    <div id="battle" style="display:none; position:absolute; top:50px; left:50px; background:white; border:2px solid black; padding:10px; z-index:20; width:400px;">
+        <div style="display:flex; justify-content:space-between;">
+          <div><b>🧙‍♂️ Герой</b></div>
+          <div><b>👾 Монстр</b> <span id="monsterStats"></span></div>
         </div>
-    </div>
-
-    <!-- Card Editor Screen -->
-    <div id="card-editor" class="screen">
-        <div class="container">
-            <h2 id="editor-title">Редактор Юнита</h2>
-            
-            <div class="editor-container">
-                <div class="editor-section">
-                    <h3>Карты Юнита</h3>
-                    <div id="card-columns" class="card-columns">
-                        <div class="column" data-stat="attack"></div>
-                        <div class="column" data-stat="health"></div>
-                        <div class="column" data-stat="speed"></div>
-                        <div class="column" data-stat="dexterity"></div>
-                    </div>
-                    
-                    <div id="combo-status" class="combo-status"></div>
-                </div>
-                
-                <div class="editor-section">
-                    <h3>Колода Карт</h3>
-                    <div id="card-pool" class="card-pool"></div>
-                </div>
-            </div>
-            
-            <div class="controls">
-                <button class="btn" onclick="gameManager.ui.saveEdits()">💾 Сохранить</button>
-                <button class="btn" onclick="gameManager.ui.closeEditor()">❌ Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Battle Screen -->
-    <div id="battle-screen" class="screen">
-        <div class="container">
-            <div class="battle-ui">
-                <h2>⚔️ Битва</h2>
-                <div class="room-counter">Комната: <span id="battle-room-count">0</span></div>
-            </div>
-            
-            <canvas id="game-canvas" width="800" height="600"></canvas>
-        </div>
-    </div>
-
-    <!-- Result Screen -->
-    <div id="result-screen" class="screen">
-        <div class="container">
-            <div class="result-container">
-                <div id="result-message" class="result-message"></div>
-                
-                <div class="controls">
-                    <button id="next-btn" class="btn" onclick="gameManager.ui.nextBattle()">➡️ Следующая Комната</button>
-                    <button id="restart-btn" class="btn" onclick="gameManager.ui.restartGame()">🔄 Начать Сначала</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="main.js"></script>
+        <div id="spellOptions" style="margin-top:10px;"></div>
+        <button id="fleeButton">🚪 Сбежать</button>
+      </div>
+    <div id="spellbook" style="display:none; position:absolute; top:10px; left:10px; background:#fff; border:1px solid #333; padding:10px; z-index:10;"></div>
+       
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="actions" style="margin-top:10px;"></div>
+    <script src="game.js"></script>
 </body>
 </html>
