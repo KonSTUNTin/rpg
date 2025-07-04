@@ -57,6 +57,8 @@ body {
     font-family: monospace;
     font-size: 14px;
     line-height: 1.4;
+    display: flex;
+    flex-flow: column-reverse;
 }
 
 .log-entry {

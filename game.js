@@ -1,8 +1,56 @@
-// Менеджер спрайтов
+import { OBJECT_CONFIGS } from './objectConfigs.js';
+import { SURFACES } from './surfaces.js';
+import { SPELLS } from './spells.js';
+
+
+// Менеджер спрайтов с улучшенной системой загрузки
 class SpriteManager {
     constructor() {
         this.sprites = new Map();
         this.loadingPromises = new Map();
+        this.loadingProgress = new Map();
+        this.totalAssets = 0;
+        this.loadedAssets = 0;
+    }
+
+    // Предзагрузка всех спрайтов
+    async preloadAllSprites() {
+        const spritesToLoad = [];
+        
+        // Собираем все спрайты из конфигураций
+        OBJECT_CONFIGS.forEach(config => {
+            if (config.sprite) {
+                spritesToLoad.push({ key: config.type, src: config.sprite });
+            }
+        });
+
+        SURFACES.forEach(surface => {
+            if (surface.sprite) {
+                spritesToLoad.push({ key: `surface_${surface.id}`, src: surface.sprite });
+            }
+        });
+
+        // Добавляем спрайт игрока если он задан
+        if (PLAYER_SPRITE) {
+            spritesToLoad.push({ key: 'player', src: PLAYER_SPRITE });
+        }
+
+        this.totalAssets = spritesToLoad.length;
+        this.loadedAssets = 0;
+
+        console.log(`Starting to load ${this.totalAssets} sprites...`);
+
+        // Загружаем все спрайты параллельно
+        const loadPromises = spritesToLoad.map(sprite => 
+            this.loadSprite(sprite.key, sprite.src)
+        );
+
+        try {
+            await Promise.all(loadPromises);
+            console.log('All sprites loaded successfully!');
+        } catch (error) {
+            console.warn('Some sprites failed to load:', error);
+        }
     }
 
     loadSprite(key, src) {
@@ -16,20 +64,35 @@ class SpriteManager {
 
         const promise = new Promise((resolve, reject) => {
             const img = new Image();
+            
             img.onload = () => {
                 this.sprites.set(key, img);
                 this.loadingPromises.delete(key);
+                this.loadedAssets++;
+                this.updateLoadingProgress();
+                console.log(`Loaded sprite: ${key} (${this.loadedAssets}/${this.totalAssets})`);
                 resolve(img);
             };
+            
             img.onerror = () => {
                 this.loadingPromises.delete(key);
-                reject(new Error(`Failed to load sprite: ${src}`));
+                this.loadedAssets++;
+                this.updateLoadingProgress();
+                console.warn(`Failed to load sprite: ${src}`);
+                // Не отклоняем промис, чтобы не блокировать загрузку других спрайтов
+                resolve(null);
             };
+            
             img.src = src;
         });
 
         this.loadingPromises.set(key, promise);
         return promise;
+    }
+
+    updateLoadingProgress() {
+        const progress = this.totalAssets > 0 ? (this.loadedAssets / this.totalAssets) * 100 : 100;
+        this.onProgress?.(progress, this.loadedAssets, this.totalAssets);
     }
 
     getSprite(key) {
@@ -39,108 +102,27 @@ class SpriteManager {
     hasSprite(key) {
         return this.sprites.has(key);
     }
+
+    getLoadingProgress() {
+        return this.totalAssets > 0 ? (this.loadedAssets / this.totalAssets) * 100 : 100;
+    }
+
+    isLoading() {
+        return this.loadedAssets < this.totalAssets;
+    }
 }
 
 // Глобальный менеджер спрайтов
 const spriteManager = new SpriteManager();
 
-// Массив конфигураций объектов
-const OBJECT_CONFIGS = [
-    {
-        type: 'monster',
-        color: 'purple',
-        sprite: null, // Можно задать путь к спрайту: 'assets/monster.png'
-        resourceGain: { '♠': 2, '♣': 1 }
-    },
-    {
-        type: 'chest',
-        color: 'gold',
-        sprite: 'images/chest.png',
-        resourceGain: { '♦': 3 }
-    }
-];
+// Спрайт игрока (можно задать)
+const PLAYER_SPRITE = null; // 'assets/player.png'
 
-// Массив заклинаний
-const SPELLS = [
-    {
-        name: 'Огненный шар',
-        cost: { '♠': 2, '♦': 1 },
-        damage: { '♥': 2, '♦': 1, '♠': 1,'♣': 2 },
-        combat: true
-    },
-    {
-        name: 'Лёд',
-        cost: { '♣': 1 },
-        damage: { '♥': 2, '♦': 1, '♠': 1,'♣': 2 },
-        combat: true
-    },
-    {
-        name: 'Исцеление',
-        cost: { '♣': 2 },
-        effect: () => alert('💚 Исцеление!'),
-        combat: false
-    },
-    {
-        name: 'Призыв сундука',
-        cost: { '♠': 1, '♣': 1 },
-        effect: function () {
-            const x = Math.floor(Math.random() * CONFIG.COLS);
-            const y = Math.floor(Math.random() * CONFIG.ROWS);
-            if (game.terrain[y][x] !== 1) {
-                game.objects.push(new Chest(x, y));
-            }
-        },
-        combat: false
-    }
-];
 
-// Массив поверхностей
-const SURFACES = [
-    {
-        id: 0,
-        name: 'Поле',
-        color: '#90EE90',
-        sprite: null,
-        probability: 0.5,
-        moveCost: { '♠': 0 },
-        actions: [
-            { label: 'Собрать урожай', cost: {}, gain: { '♠': 1 }, combat: false, depth: 1 },
-            { label: 'Построить амбар', cost: { '♠': 2 }, gain: { '♦': 1 }, combat: false, depth: 1 }
-        ]
-    },
-    {
-        id: 1,
-        name: 'Скалы',
-        color: '#A9A9A9',
-        sprite: null, // Можно задать путь к спрайту: 'assets/rocks.png'
-        probability: 0.1,
-        moveCost: { '♠': 0 },
-        actions: []
-    },
-    {
-        id: 2,
-        name: 'Река',
-        color: '#87CEEB',
-        sprite: null, // Можно задать путь к спрайту: 'assets/river.png'
-        probability: 0.4,
-        moveCost: { '♣': 0 },
-        actions: [
-            { label: 'Порыбачить', cost: {}, gain: { '♣': 1 }, combat: false, depth: 2 },
-            { label: 'Набрать воду', cost: { '♣': 1 }, gain: { '♦': 2 }, combat: false, depth: 2 }
-        ]
-    },
-    {
-        id: 3,
-        name: 'Лес',
-        color: '#006400',
-        sprite: null, // Можно задать путь к спрайту: 'assets/forest.png'
-        probability: 0.4,
-        moveCost: { '♣': 0 },
-        actions: [
-            { label: 'Рубить лес', cost: {}, gain: { '♣': 1 }, combat: false, depth: 3 }
-        ]
-    }
-];
+
+
+
+
 
 // Основная конфигурация игры
 const CONFIG = {
@@ -160,6 +142,102 @@ const CONFIG = {
     SURFACES: SURFACES
 };
 
+// Загрузчик игры
+class GameLoader {
+    constructor() {
+        this.loadingElement = null;
+        this.progressBar = null;
+        this.progressText = null;
+        this.createLoadingUI();
+    }
+
+    createLoadingUI() {
+        // Создаем элементы загрузки
+        this.loadingElement = document.createElement('div');
+        this.loadingElement.id = 'gameLoader';
+        this.loadingElement.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-family: Arial, sans-serif;
+        `;
+
+        const title = document.createElement('h2');
+        title.textContent = 'Загрузка игры...';
+        title.style.marginBottom = '30px';
+
+        const progressContainer = document.createElement('div');
+        progressContainer.style.cssText = `
+            width: 300px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        `;
+
+        this.progressBar = document.createElement('div');
+        this.progressBar.style.cssText = `
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        `;
+
+        this.progressText = document.createElement('div');
+        this.progressText.style.cssText = `
+            text-align: center;
+            font-size: 14px;
+            margin-top: 10px;
+        `;
+
+        progressContainer.appendChild(this.progressBar);
+        this.loadingElement.appendChild(title);
+        this.loadingElement.appendChild(progressContainer);
+        this.loadingElement.appendChild(this.progressText);
+
+        document.body.appendChild(this.loadingElement);
+    }
+
+    updateProgress(progress, loaded, total) {
+        if (this.progressBar) {
+            this.progressBar.style.width = `${progress}%`;
+        }
+        if (this.progressText) {
+            this.progressText.textContent = `${loaded}/${total} ресурсов загружено (${Math.round(progress)}%)`;
+        }
+    }
+
+    hide() {
+        if (this.loadingElement) {
+            this.loadingElement.style.display = 'none';
+        }
+    }
+
+    show() {
+        if (this.loadingElement) {
+            this.loadingElement.style.display = 'flex';
+        }
+    }
+
+    destroy() {
+        if (this.loadingElement) {
+            document.body.removeChild(this.loadingElement);
+            this.loadingElement = null;
+        }
+    }
+}
+
 class GameObject {
     constructor(x, y, type) {
         this.x = x;
@@ -168,19 +246,8 @@ class GameObject {
         this.config = CONFIG.OBJECT_CONFIG[type];
         this.spriteLoaded = false;
         
-        // Загружаем спрайт если он задан
-        if (this.config.sprite) {
-            this.loadSprite();
-        }
-    }
-
-    async loadSprite() {
-        try {
-            await spriteManager.loadSprite(this.type, this.config.sprite);
-            this.spriteLoaded = true;
-        } catch (error) {
-            console.warn(`Failed to load sprite for ${this.type}:`, error);
-        }
+        // Спрайт уже должен быть загружен через preloader
+        this.spriteLoaded = spriteManager.hasSprite(this.type);
     }
 
     interact(player) {
@@ -254,22 +321,11 @@ class Player {
         this.y = y;
         this.resources = resources;
         this.color = 'red';
-        this.sprite = null; // Можно задать путь к спрайту игрока: 'assets/player.png'
+        this.sprite = PLAYER_SPRITE;
         this.spriteLoaded = false;
         
-        // Загружаем спрайт если он задан
-        if (this.sprite) {
-            this.loadSprite();
-        }
-    }
-
-    async loadSprite() {
-        try {
-            await spriteManager.loadSprite('player', this.sprite);
-            this.spriteLoaded = true;
-        } catch (error) {
-            console.warn('Failed to load player sprite:', error);
-        }
+        // Спрайт уже должен быть загружен через preloader
+        this.spriteLoaded = spriteManager.hasSprite('player');
     }
 
     canAfford(cost) {
@@ -322,19 +378,6 @@ class TerrainManager {
         this.seedY = Math.random() * 1000;
         this.map = this.generate();
         this.depthMap = this.generateDepthMap();
-        this.loadSurfaceSprites();
-    }
-
-    async loadSurfaceSprites() {
-        for (const surface of this.surfaces) {
-            if (surface.sprite) {
-                try {
-                    await spriteManager.loadSprite(`surface_${surface.id}`, surface.sprite);
-                } catch (error) {
-                    console.warn(`Failed to load surface sprite for ${surface.name}:`, error);
-                }
-            }
-        }
     }
 
     noise(x, y) {
@@ -405,6 +448,45 @@ class TerrainManager {
         // Рисуем границы клетки
         ctx.strokeStyle = '#333';
         ctx.strokeRect(tileX, tileY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+
+        // Рисуем доступные ресурсы в углах
+        this.drawResourceIndicators(ctx, tileX, tileY, surface);
+    }
+
+    drawResourceIndicators(ctx, tileX, tileY, surface) {
+        if (!surface.resourceGain) return;
+
+        const resources = Object.entries(surface.resourceGain);
+        const cornerSize = 12;
+        
+        // Позиции углов: верхний левый, верхний правый, нижний левый, нижний правый
+        const corners = [
+            { x: tileX + 2, y: tileY + 2 },
+            { x: tileX + CONFIG.TILE_SIZE - cornerSize - 2, y: tileY + 2 },
+            { x: tileX + 2, y: tileY + CONFIG.TILE_SIZE - cornerSize - 2 },
+            { x: tileX + CONFIG.TILE_SIZE - cornerSize - 2, y: tileY + CONFIG.TILE_SIZE - cornerSize - 2 }
+        ];
+
+        resources.forEach(([resourceType, amount], index) => {
+            if (index < corners.length) {
+                const corner = corners[index];
+                
+                // Рисуем полупрозрачный черный квадратик
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(corner.x, corner.y, cornerSize, cornerSize);
+                
+                // Рисуем символ ресурса
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(
+                    resourceType,
+                    corner.x + cornerSize / 2,
+                    corner.y + cornerSize / 2
+                );
+            }
+        });
     }
 }
 
@@ -423,10 +505,103 @@ class Game {
         this.paused = false;
         this.currentMonster = null;
         this.currentMonsterIndex = -1;
+        this.gameLog = []; // Массив для хранения логов
+        this.maxLogEntries = 10; // Максимальное количество записей в логе
+        
         this.generateObjects();
         this.bindKeys();
         this.updateUI();
+        this.addLog('🎮 Игра началась! Используйте стрелки для перемещения.');
         requestAnimationFrame(() => this.update());
+    }
+
+    // Метод для добавления записи в лог
+    addLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = {
+            message,
+            timestamp,
+            id: Date.now() + Math.random()
+        };
+        
+        // Добавляем в начало массива
+        this.gameLog.push(logEntry);
+        
+        // Ограничиваем количество записей
+        // if (this.gameLog.length > this.maxLogEntries) {
+        //     this.gameLog = this.gameLog.slice(0, this.maxLogEntries);
+        // }
+    
+        this.updateLogDisplay();
+    }
+    
+
+    // Метод для обновления отображения лога
+    updateLogDisplay() {
+        const logContainer = document.getElementById('gameLog');
+        if (!logContainer) {
+            // Создаем контейнер для лога если его нет
+            this.createLogContainer();
+            return;
+        }
+
+        logContainer.innerHTML = '';
+        
+        this.gameLog.forEach((entry, index) => {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.style.cssText = `
+                padding: 5px;
+                margin-bottom: 2px;
+                background: ${index === 0 ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
+                border-left: 3px solid ${index === 0 ? '#4CAF50' : '#666'};
+                font-size: 12px;
+                opacity: ${1 - (index * 0.1)};
+                transition: all 0.3s ease;
+            `;
+            
+            logEntry.innerHTML = `
+                <span style="color: #888; font-size: 10px;">[${entry.timestamp}]</span>
+                <span style="margin-left: 8px;">${entry.message}</span>
+            `;
+        
+            logContainer.appendChild(logEntry); // 👈 теперь можно просто append
+        });
+        
+    }
+    // Создание контейнера для лога
+    createLogContainer() {
+        const logContainer = document.createElement('div');
+        logContainer.id = 'gameLog';
+        logContainer.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            z-index: 100;
+        `;
+
+        const title = document.createElement('div');
+        title.style.cssText = `
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #4CAF50;
+            border-bottom: 1px solid #333;
+            padding-bottom: 3px;
+        `;
+        title.textContent = 'Лог событий';
+
+        logContainer.appendChild(title);
+        document.body.appendChild(logContainer);
+        
+        this.updateLogDisplay();
     }
 
     generateObjects() {
@@ -467,14 +642,14 @@ class Game {
                         this.player.applyCost(surface.moveCost);
                         this.player.x = newX;
                         this.player.y = newY;
+                        this.addLog(`🚶 Перемещение в ${surface.name} (${newX}, ${newY})`);
                         this.interactWithObjects();
                         this.updateUI();
-                        this.updateGameStatus(`Moved to ${surface.name}`);
                     } else {
-                        this.updateGameStatus('Cannot move - insufficient resources');
+                        this.addLog('⚠️ Недостаточно ресурсов для перемещения');
                     }
                 } else {
-                    this.updateGameStatus('Cannot move - boundary reached');
+                    this.addLog('⚠️ Достигнута граница карты');
                 }
             }
         });
@@ -485,9 +660,11 @@ class Game {
         if (objIndex !== -1) {
             const obj = this.objects[objIndex];
             if (obj instanceof Monster) {
+                this.addLog('⚔️ Началась битва с монстром!');
                 this.startBattle(obj, objIndex);
             } else {
                 obj.interact(this.player);
+                this.addLog(`💰 Найден ${obj.type}! Получены ресурсы: ${formatResources(obj.config.resourceGain)}`);
                 this.objects.splice(objIndex, 1);
             }
         }
@@ -539,10 +716,11 @@ class Game {
                 }
                 this.player.applyCost(spell.cost);
                 this.currentMonster.receiveDamage(spell.damage);
+                this.addLog(`⚡ Использовано заклинание "${spell.name}" - урон: ${formatResources(spell.damage)}`);
                 
                 if (this.currentMonster.isDead()) {
                     this.objects.splice(this.currentMonsterIndex, 1);
-                    this.updateGameStatus('Monster defeated!');
+                    this.addLog('🏆 Монстр побежден!');
                     this.endBattle();
                     this.generateObjects(); // Spawn new monsters
                 } else {
@@ -560,6 +738,7 @@ class Game {
         fleeBtn.className = 'battle-button flee-button';
         fleeBtn.textContent = '🏃 Сбежать';
         fleeBtn.onclick = () => {
+            this.addLog('🏃 Вы сбежали из битвы');
             this.endBattle();
         };
         battleContent.appendChild(fleeBtn);
@@ -570,7 +749,6 @@ class Game {
         this.currentMonster = null;
         this.currentMonsterIndex = -1;
         this.paused = false;
-        this.updateGameStatus('Ready to explore');
         
         const battleOverlay = document.getElementById('battleOverlay');
         const battlePanel = document.getElementById('battle');
@@ -587,72 +765,69 @@ class Game {
         }, 100);
     }
 
-    updateGameStatus(message) {
-        const statusElement = document.getElementById('gameStatus');
-        if (statusElement) {
-            statusElement.textContent = message;
-            statusElement.style.color = this.paused ? 'red' : 'green';
-        }
-    }
-
     updateUI() {
         // Update spells panel
         const spellsList = document.getElementById('spellsList');
-        spellsList.innerHTML = '';
-        
-        const nonCombatSpells = CONFIG.SPELLS.filter(s => !s.combat);
-        nonCombatSpells.forEach(spell => {
-            const spellDiv = document.createElement('div');
-            spellDiv.className = 'spell-info';
+        if (spellsList) {
+            spellsList.innerHTML = '';
             
-            const canAfford = this.player.canAfford(spell.cost);
-            const btn = document.createElement('button');
-            btn.className = 'battle-button';
-            btn.textContent = `${spell.name} (${formatResources(spell.cost)})`;
-            btn.disabled = !canAfford;
-            
-            btn.onclick = () => {
-                if (this.player.canAfford(spell.cost)) {
-                    this.player.applyCost(spell.cost);
-                    if (spell.effect) {
-                        spell.effect();
-                    }
-                    this.updateUI();
-                }
-            };
-            
-            spellDiv.appendChild(btn);
-            spellsList.appendChild(spellDiv);
-        });
-
-        // Update terrain actions
-        const actionsList = document.getElementById('actionsList');
-        actionsList.innerHTML = '';
-        
-        const currentSurface = this.terrainManager.getSurface(this.terrain[this.player.y][this.player.x]);
-        if (currentSurface && currentSurface.actions) {
-            currentSurface.actions.forEach(action => {
-                const actionDiv = document.createElement('div');
-                actionDiv.className = 'spell-info';
+            const nonCombatSpells = CONFIG.SPELLS.filter(s => !s.combat);
+            nonCombatSpells.forEach(spell => {
+                const spellDiv = document.createElement('div');
+                spellDiv.className = 'spell-info';
                 
-                const canAfford = this.player.canAfford(action.cost);
+                const canAfford = this.player.canAfford(spell.cost);
                 const btn = document.createElement('button');
                 btn.className = 'battle-button';
-                btn.textContent = `${action.label} (${formatResources(action.cost)}) → ${formatResources(action.gain)}`;
+                btn.textContent = `${spell.name} (${formatResources(spell.cost)})`;
                 btn.disabled = !canAfford;
                 
                 btn.onclick = () => {
-                    if (this.player.canAfford(action.cost)) {
-                        this.player.applyCost(action.cost);
-                        this.player.gain(action.gain);
+                    if (this.player.canAfford(spell.cost)) {
+                        this.player.applyCost(spell.cost);
+                        this.addLog(`✨ Использовано заклинание "${spell.name}"`);
+                        if (spell.effect) {
+                            spell.effect();
+                        }
                         this.updateUI();
-                        this.updateGameStatus(`Performed ${action.label}`);
                     }
                 };
                 
-                actionDiv.appendChild(btn);
-                actionsList.appendChild(actionDiv);
+                spellDiv.appendChild(btn);
+                spellsList.appendChild(spellDiv);
             });
+        }
+
+        // Update terrain actions
+        const actionsList = document.getElementById('actionsList');
+        if (actionsList) {
+            actionsList.innerHTML = '';
+            
+            const currentSurface = this.terrainManager.getSurface(this.terrain[this.player.y][this.player.x]);
+            if (currentSurface && currentSurface.actions) {
+                currentSurface.actions.forEach(action => {
+                    const actionDiv = document.createElement('div');
+                    actionDiv.className = 'spell-info';
+                    
+                    const canAfford = this.player.canAfford(action.cost);
+                    const btn = document.createElement('button');
+                    btn.className = 'battle-button';
+                    btn.textContent = `${action.label} (${formatResources(action.cost)}) → ${formatResources(action.gain)}`;
+                    btn.disabled = !canAfford;
+                    
+                    btn.onclick = () => {
+                        if (this.player.canAfford(action.cost)) {
+                            this.player.applyCost(action.cost);
+                            this.player.gain(action.gain);
+                            this.addLog(`🔨 Выполнено действие "${action.label}" - получено: ${formatResources(action.gain)}`);
+                            this.updateUI();
+                        }
+                    };
+                    
+                    actionDiv.appendChild(btn);
+                    actionsList.appendChild(actionDiv);
+                });
+            }
         }
     }
 
@@ -697,4 +872,81 @@ class Game {
     }
 }
 
-let game = new Game();
+// Главная функция инициализации игры
+async function initGame() {
+    console.log('Starting game initialization...');
+    
+    // Создаем загрузчик
+    const loader = new GameLoader();
+    
+    // Настраиваем обратный вызов для обновления прогресса
+    spriteManager.onProgress = (progress, loaded, total) => {
+        loader.updateProgress(progress, loaded, total);
+    };
+    
+    try {
+        // Показываем загрузчик
+        loader.show();
+        
+        // Предзагружаем все спрайты
+        await spriteManager.preloadAllSprites();
+        
+        // Небольшая задержка для плавности
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Скрываем загрузчик
+        loader.hide();
+        
+        // Создаем игру
+        window.game = new Game();
+        
+        console.log('Game initialized successfully!');
+        
+        // Удаляем загрузчик через некоторое время
+        setTimeout(() => {
+            loader.destroy();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Failed to initialize game:', error);
+        
+        // Показываем ошибку пользователю
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1001;
+        `;
+        errorDiv.textContent = 'Ошибка загрузки игры. Попробуйте обновить страницу.';
+        document.body.appendChild(errorDiv);
+    }
+}
+
+// Функция для ручной перезагрузки ресурсов
+function reloadAssets() {
+    if (window.game) {
+        delete window.game;
+    }
+    
+    // Очищаем менеджер спрайтов
+    spriteManager.sprites.clear();
+    spriteManager.loadingPromises.clear();
+    spriteManager.loadedAssets = 0;
+    
+    // Перезапускаем игру
+    initGame();
+}
+
+// Автоматический запуск при загрузке страницы
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+} else {
+    // Если документ уже загружен
+    initGame();
+}
