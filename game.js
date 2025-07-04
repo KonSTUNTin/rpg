@@ -1,98 +1,163 @@
+// Менеджер спрайтов
+class SpriteManager {
+    constructor() {
+        this.sprites = new Map();
+        this.loadingPromises = new Map();
+    }
 
+    loadSprite(key, src) {
+        if (this.sprites.has(key)) {
+            return Promise.resolve(this.sprites.get(key));
+        }
+
+        if (this.loadingPromises.has(key)) {
+            return this.loadingPromises.get(key);
+        }
+
+        const promise = new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                this.sprites.set(key, img);
+                this.loadingPromises.delete(key);
+                resolve(img);
+            };
+            img.onerror = () => {
+                this.loadingPromises.delete(key);
+                reject(new Error(`Failed to load sprite: ${src}`));
+            };
+            img.src = src;
+        });
+
+        this.loadingPromises.set(key, promise);
+        return promise;
+    }
+
+    getSprite(key) {
+        return this.sprites.get(key);
+    }
+
+    hasSprite(key) {
+        return this.sprites.has(key);
+    }
+}
+
+// Глобальный менеджер спрайтов
+const spriteManager = new SpriteManager();
+
+// Массив конфигураций объектов
+const OBJECT_CONFIGS = [
+    {
+        type: 'monster',
+        color: 'purple',
+        sprite: null, // Можно задать путь к спрайту: 'assets/monster.png'
+        resourceGain: { '♠': 2, '♣': 1 }
+    },
+    {
+        type: 'chest',
+        color: 'gold',
+        sprite: 'images/chest.png',
+        resourceGain: { '♦': 3 }
+    }
+];
+
+// Массив заклинаний
+const SPELLS = [
+    {
+        name: 'Огненный шар',
+        cost: { '♠': 2, '♦': 1 },
+        damage: { '♥': 2, '♦': 1, '♠': 1,'♣': 2 },
+        combat: true
+    },
+    {
+        name: 'Лёд',
+        cost: { '♣': 1 },
+        damage: { '♥': 2, '♦': 1, '♠': 1,'♣': 2 },
+        combat: true
+    },
+    {
+        name: 'Исцеление',
+        cost: { '♣': 2 },
+        effect: () => alert('💚 Исцеление!'),
+        combat: false
+    },
+    {
+        name: 'Призыв сундука',
+        cost: { '♠': 1, '♣': 1 },
+        effect: function () {
+            const x = Math.floor(Math.random() * CONFIG.COLS);
+            const y = Math.floor(Math.random() * CONFIG.ROWS);
+            if (game.terrain[y][x] !== 1) {
+                game.objects.push(new Chest(x, y));
+            }
+        },
+        combat: false
+    }
+];
+
+// Массив поверхностей
+const SURFACES = [
+    {
+        id: 0,
+        name: 'Поле',
+        color: '#90EE90',
+        sprite: null,
+        probability: 0.5,
+        moveCost: { '♠': 0 },
+        actions: [
+            { label: 'Собрать урожай', cost: {}, gain: { '♠': 1 }, combat: false, depth: 1 },
+            { label: 'Построить амбар', cost: { '♠': 2 }, gain: { '♦': 1 }, combat: false, depth: 1 }
+        ]
+    },
+    {
+        id: 1,
+        name: 'Скалы',
+        color: '#A9A9A9',
+        sprite: null, // Можно задать путь к спрайту: 'assets/rocks.png'
+        probability: 0.1,
+        moveCost: { '♠': 0 },
+        actions: []
+    },
+    {
+        id: 2,
+        name: 'Река',
+        color: '#87CEEB',
+        sprite: null, // Можно задать путь к спрайту: 'assets/river.png'
+        probability: 0.4,
+        moveCost: { '♣': 0 },
+        actions: [
+            { label: 'Порыбачить', cost: {}, gain: { '♣': 1 }, combat: false, depth: 2 },
+            { label: 'Набрать воду', cost: { '♣': 1 }, gain: { '♦': 2 }, combat: false, depth: 2 }
+        ]
+    },
+    {
+        id: 3,
+        name: 'Лес',
+        color: '#006400',
+        sprite: null, // Можно задать путь к спрайту: 'assets/forest.png'
+        probability: 0.4,
+        moveCost: { '♣': 0 },
+        actions: [
+            { label: 'Рубить лес', cost: {}, gain: { '♣': 1 }, combat: false, depth: 3 }
+        ]
+    }
+];
+
+// Основная конфигурация игры
 const CONFIG = {
     TILE_SIZE: 50,
     ROWS: 8,
     COLS: 12,
     MONSTER_COUNT: 5,
-
-    OBJECT_CONFIG: {
-        monster: {
-            type: 'monster',
-            color: 'purple',
-            resourceGain: { '♠': 2, '♣': 1 }
-        },
-        chest: {
-            type: 'chest',
-            color: 'gold',
-            resourceGain: { '♦': 3 }
-        }
-    },
-
-    SPELLS: [
-        {
-            name: 'Огненный шар',
-            cost: { '♠': 2, '♦': 1 },
-            damage: { '♥': 2 },
-            combat: true
-        },
-        {
-            name: 'Лёд',
-            cost: { '♣': 1 },
-            damage: { '♠': 1 },
-            combat: true
-        },
-        {
-            name: 'Исцеление',
-            cost: { '♣': 2 },
-            effect: () => alert('💚 Исцеление!'),
-            combat: false
-        },
-        {
-            name: 'Призыв сундука',
-            cost: { '♠': 1, '♣': 1 },
-            effect: function () {
-                const x = Math.floor(Math.random() * CONFIG.COLS);
-                const y = Math.floor(Math.random() * CONFIG.ROWS);
-                if (game.terrain[y][x] !== 1) {
-                    game.objects.push(new Chest(x, y));
-                }
-            },
-            combat: false
-        }
-    ],
-
-    SURFACES: [
-        {
-            id: 0,
-            name: 'Поле',
-            color: '#90EE90',
-            probability: 0.5,
-            moveCost: { '♠': 0 },
-            actions: [
-                { label: 'Собрать урожай', cost: {}, gain: { '♠': 1 }, combat: false, depth: 1 },
-                { label: 'Построить амбар', cost: { '♠': 2 }, gain: { '♦': 1 }, combat: false, depth: 1 }
-            ]
-        },
-        {
-            id: 1,
-            name: 'Скалы',
-            color: '#A9A9A9',
-            probability: 0.1,
-            moveCost: { '♠': 0 },
-            actions: []
-        },
-        {
-            id: 2,
-            name: 'Река',
-            color: '#87CEEB',
-            probability: 0.4,
-            moveCost: { '♣': 0 },
-            actions: [
-                { label: 'Порыбачить', cost: {}, gain: { '♣': 1 }, combat: false, depth: 2 },
-                { label: 'Набрать воду', cost: { '♣': 1 }, gain: { '♦': 2 }, combat: false, depth: 2 }
-            ]
-        },
-        {
-            id: 3,
-            name: 'Лес',
-            color: '#006400',
-            probability: 0.4,
-            moveCost: { '♣': 0 },
-            actions: [
-                { label: 'Рубить лес', cost: {}, gain: { '♣': 1 }, combat: false, depth: 3 }
-            ]
-        }
-    ]
+    
+    // Преобразуем массив объектов в объект для быстрого доступа
+    OBJECT_CONFIG: OBJECT_CONFIGS.reduce((acc, config) => {
+        acc[config.type] = config;
+        return acc;
+    }, {}),
+    
+    // Используем массивы из отдельных конфигураций
+    SPELLS: SPELLS,
+    SURFACES: SURFACES
 };
 
 class GameObject {
@@ -101,6 +166,21 @@ class GameObject {
         this.y = y;
         this.type = type;
         this.config = CONFIG.OBJECT_CONFIG[type];
+        this.spriteLoaded = false;
+        
+        // Загружаем спрайт если он задан
+        if (this.config.sprite) {
+            this.loadSprite();
+        }
+    }
+
+    async loadSprite() {
+        try {
+            await spriteManager.loadSprite(this.type, this.config.sprite);
+            this.spriteLoaded = true;
+        } catch (error) {
+            console.warn(`Failed to load sprite for ${this.type}:`, error);
+        }
     }
 
     interact(player) {
@@ -110,13 +190,31 @@ class GameObject {
     }
 
     draw(ctx) {
-        const cx = this.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        const cy = this.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, CONFIG.TILE_SIZE / 4, 0, 2 * Math.PI);
-        ctx.fillStyle = this.config.color;
-        ctx.fill();
-        ctx.stroke();
+        const x = this.x * CONFIG.TILE_SIZE;
+        const y = this.y * CONFIG.TILE_SIZE;
+        const cx = x + CONFIG.TILE_SIZE / 2;
+        const cy = y + CONFIG.TILE_SIZE / 2;
+
+        // Проверяем, есть ли спрайт
+        if (this.config.sprite && spriteManager.hasSprite(this.type)) {
+            const sprite = spriteManager.getSprite(this.type);
+            const size = CONFIG.TILE_SIZE * 0.8; // Спрайт немного меньше клетки
+            ctx.drawImage(
+                sprite,
+                cx - size / 2,
+                cy - size / 2,
+                size,
+                size
+            );
+        } else {
+            // Рисуем цветной круг если спрайта нет
+            ctx.beginPath();
+            ctx.arc(cx, cy, CONFIG.TILE_SIZE / 4, 0, 2 * Math.PI);
+            ctx.fillStyle = this.config.color;
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+        }
     }
 }
 
@@ -155,6 +253,23 @@ class Player {
         this.x = x;
         this.y = y;
         this.resources = resources;
+        this.color = 'red';
+        this.sprite = null; // Можно задать путь к спрайту игрока: 'assets/player.png'
+        this.spriteLoaded = false;
+        
+        // Загружаем спрайт если он задан
+        if (this.sprite) {
+            this.loadSprite();
+        }
+    }
+
+    async loadSprite() {
+        try {
+            await spriteManager.loadSprite('player', this.sprite);
+            this.spriteLoaded = true;
+        } catch (error) {
+            console.warn('Failed to load player sprite:', error);
+        }
     }
 
     canAfford(cost) {
@@ -168,6 +283,34 @@ class Player {
     gain(gain) {
         for (let res in gain) this.resources[res] = (this.resources[res] || 0) + gain[res];
     }
+
+    draw(ctx) {
+        const x = this.x * CONFIG.TILE_SIZE;
+        const y = this.y * CONFIG.TILE_SIZE;
+        const cx = x + CONFIG.TILE_SIZE / 2;
+        const cy = y + CONFIG.TILE_SIZE / 2;
+
+        // Проверяем, есть ли спрайт
+        if (this.sprite && spriteManager.hasSprite('player')) {
+            const sprite = spriteManager.getSprite('player');
+            const size = CONFIG.TILE_SIZE * 0.8; // Спрайт немного меньше клетки
+            ctx.drawImage(
+                sprite,
+                cx - size / 2,
+                cy - size / 2,
+                size,
+                size
+            );
+        } else {
+            // Рисуем цветной круг если спрайта нет
+            ctx.beginPath();
+            ctx.arc(cx, cy, CONFIG.TILE_SIZE / 4, 0, 2 * Math.PI);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+        }
+    }
 }
 
 class TerrainManager {
@@ -179,6 +322,19 @@ class TerrainManager {
         this.seedY = Math.random() * 1000;
         this.map = this.generate();
         this.depthMap = this.generateDepthMap();
+        this.loadSurfaceSprites();
+    }
+
+    async loadSurfaceSprites() {
+        for (const surface of this.surfaces) {
+            if (surface.sprite) {
+                try {
+                    await spriteManager.loadSprite(`surface_${surface.id}`, surface.sprite);
+                } catch (error) {
+                    console.warn(`Failed to load surface sprite for ${surface.name}:`, error);
+                }
+            }
+        }
     }
 
     noise(x, y) {
@@ -224,6 +380,31 @@ class TerrainManager {
 
     getSurface(id) {
         return this.surfaces.find(s => s.id === id);
+    }
+
+    drawTile(ctx, x, y, surface) {
+        const tileX = x * CONFIG.TILE_SIZE;
+        const tileY = y * CONFIG.TILE_SIZE;
+
+        // Проверяем, есть ли спрайт для этой поверхности
+        if (surface.sprite && spriteManager.hasSprite(`surface_${surface.id}`)) {
+            const sprite = spriteManager.getSprite(`surface_${surface.id}`);
+            ctx.drawImage(
+                sprite,
+                tileX,
+                tileY,
+                CONFIG.TILE_SIZE,
+                CONFIG.TILE_SIZE
+            );
+        } else {
+            // Рисуем цветной прямоугольник если спрайта нет
+            ctx.fillStyle = surface.color;
+            ctx.fillRect(tileX, tileY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+        }
+
+        // Рисуем границы клетки
+        ctx.strokeStyle = '#333';
+        ctx.strokeRect(tileX, tileY, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
     }
 }
 
@@ -489,23 +670,13 @@ class Game {
             for (let x = 0; x < CONFIG.COLS; x++) {
                 const tileId = this.terrain[y][x];
                 const surface = this.terrainManager.getSurface(tileId);
-                this.ctx.fillStyle = surface.color;
-                this.ctx.fillRect(x * CONFIG.TILE_SIZE, y * CONFIG.TILE_SIZE, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
-                this.ctx.strokeStyle = '#333';
-                this.ctx.strokeRect(x * CONFIG.TILE_SIZE, y * CONFIG.TILE_SIZE, CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+                this.terrainManager.drawTile(this.ctx, x, y, surface);
             }
         }
     }
 
     drawPlayer() {
-        const cx = this.player.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        const cy = this.player.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        this.ctx.beginPath();
-        this.ctx.arc(cx, cy, CONFIG.TILE_SIZE / 4, 0, 2 * Math.PI);
-        this.ctx.fillStyle = 'red';
-        this.ctx.fill();
-        this.ctx.strokeStyle = '#000';
-        this.ctx.stroke();
+        this.player.draw(this.ctx);
     }
 
     drawObjects() {
