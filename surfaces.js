@@ -41,7 +41,9 @@ const SURFACES = [
         probability: 0.4,
         moveCost: { '♣': 0 },
         actions: [
-            { label: 'Рубить лес', cost: {}, gain: { '♣': 1 } }
+            { label: 'Рубить лес', cost: {}, gain: { '♣': 1 } },
+            { label: 'Призвать птиц', cost: {}, gain: { '♣': 1 } },
+            { label: 'Убить бурундуков', cost: {}, gain: { '♣': 1 } }
         ]
     }
 ];

@@ -1,10 +1,6 @@
 const { useState, useEffect, useCallback, useRef } = React;
 
-// ===== КОНФИГУРАЦИИ =====
-
-
-
-
+// ===== КОНФИГУРАЦИИ (MOCK DATA) =====
 const CONFIG = {
     ROWS: 8,
     COLS: 12,
@@ -126,6 +122,329 @@ class TerrainManager {
         return this.surfaces.find(s => s.id === id);
     }
 }
+
+// ===== UI КОМПОНЕНТЫ =====
+
+// Компонент ресурса
+const ResourceItem = ({ symbol, amount }) => (
+    <span className="resource">
+        {symbol} {amount}
+    </span>
+);
+
+// Панель ресурсов
+const ResourcesPanel = ({ resources }) => (
+    <div className="resources-panel">
+        <h3>Ресурсы:</h3>
+        <div className="resources">
+            {Object.entries(resources).map(([symbol, amount]) => (
+                <ResourceItem key={symbol} symbol={symbol} amount={amount} />
+            ))}
+        </div>
+    </div>
+);
+
+// Клетка местности
+const TerrainCell = ({ x, y, surface, isPlayerHere, objectHere }) => (
+    <div
+        className="terrain-cell"
+        style={{ backgroundColor: surface?.color }}
+        title={`${surface?.name} (${x}, ${y})`}
+    >
+        <div className="surface-emoji">{surface?.emoji}</div>
+        {isPlayerHere && <div className="player">🧙‍♂️</div>}
+        {objectHere && (
+            <div className="game-object">
+                {objectHere.config.emoji}
+            </div>
+        )}
+    </div>
+);
+
+// Ряд местности
+const TerrainRow = ({ y, cols, terrainManager, player, gameObjects }) => (
+    <div className="terrain-row">
+        {Array.from({ length: cols }, (_, x) => {
+            const terrain = terrainManager?.map || [];
+            const surface = terrainManager?.getSurface(terrain[y]?.[x]);
+            const isPlayerHere = player.x === x && player.y === y;
+            const objectHere = gameObjects.find(obj => obj.x === x && obj.y === y);
+            
+            return (
+                <TerrainCell
+                    key={x}
+                    x={x}
+                    y={y}
+                    surface={surface}
+                    isPlayerHere={isPlayerHere}
+                    objectHere={objectHere}
+                />
+            );
+        })}
+    </div>
+);
+
+// Игровое поле
+const GameArea = ({ rows, cols, terrainManager, player, gameObjects }) => (
+    <div className="game-area">
+        <div className="terrain-grid">
+            {Array.from({ length: rows }, (_, y) => (
+                <TerrainRow
+                    key={y}
+                    y={y}
+                    cols={cols}
+                    terrainManager={terrainManager}
+                    player={player}
+                    gameObjects={gameObjects}
+                />
+            ))}
+        </div>
+    </div>
+);
+
+// Кнопка действия
+const ActionButton = ({ 
+    actionKey, 
+    emoji, 
+    title, 
+    cost, 
+    gain, 
+    canUse, 
+    onClick, 
+    className = "action-button" 
+}) => (
+    <button
+        className={`${className} ${!canUse ? 'disabled' : ''}`}
+        onClick={onClick}
+        disabled={!canUse}
+    >
+        {actionKey && <span className="hotkey">{actionKey}</span>}
+        {emoji && <span className="spell-emoji">{emoji}</span>}
+        <div className="button-content">
+            <div className="button-title">{title}</div>
+            <div className="button-cost">
+                {cost && Object.keys(cost).length > 0 && 
+                    `Стоимость: ${formatResources(cost)}`
+                }
+                {cost && gain && Object.keys(cost).length > 0 && ' → '}
+                {gain && `Получить: ${formatResources(gain)}`}
+            </div>
+        </div>
+    </button>
+);
+
+// Боевая кнопка заклинания
+const BattleSpellButton = ({ spell, actionKey, canUse, onUseSpell }) => (
+    <ActionButton
+        actionKey={actionKey}
+        emoji={spell.emoji}
+        title={spell.name}
+        cost={spell.cost}
+        gain={spell.damage ? `Урон: ${formatResources(spell.damage)}` : null}
+        canUse={canUse}
+        onClick={() => onUseSpell(spell)}
+        className="battle-button"
+    />
+);
+
+// Панель заклинаний
+const SpellsPanel = ({ spells, actionMappings, canAfford, onUseSpell }) => (
+    <div className="spells-panel">
+        <h3>Заклинания</h3>
+        {spells.filter(s => !s.combat).map((spell) => {
+            const actionKey = Object.keys(actionMappings).find(key => 
+                actionMappings[key].description === `Заклинание: ${spell.name}`
+            );
+            const canUse = canAfford(spell.cost);
+            
+            return (
+                <ActionButton
+                    key={spell.name}
+                    actionKey={actionKey}
+                    emoji={spell.emoji}
+                    title={spell.name}
+                    cost={spell.cost}
+                    canUse={canUse}
+                    onClick={() => onUseSpell(spell)}
+                />
+            );
+        })}
+    </div>
+);
+
+// Панель действий на местности
+const TerrainActionsPanel = ({ 
+    terrainManager, 
+    player, 
+    actionMappings, 
+    canAfford, 
+    onPerformTerrainAction 
+}) => {
+    const terrain = terrainManager?.map || [];
+    const currentSurface = terrainManager?.getSurface(terrain[player.y]?.[player.x]);
+    
+    if (!currentSurface?.actions?.length) {
+        return (
+            <div className="terrain-actions">
+                <h3>Действия на местности</h3>
+                <p>Нет доступных действий</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="terrain-actions">
+            <h3>Действия на местности</h3>
+            {currentSurface.actions.map((action) => {
+                const actionKey = Object.keys(actionMappings).find(key => 
+                    actionMappings[key].description === `Действие: ${action.label}`
+                );
+                const canUse = canAfford(action.cost);
+                
+                return (
+                    <ActionButton
+                        key={action.label}
+                        actionKey={actionKey}
+                        title={action.label}
+                        cost={action.cost}
+                        gain={action.gain}
+                        canUse={canUse}
+                        onClick={() => onPerformTerrainAction(action)}
+                    />
+                );
+            })}
+        </div>
+    );
+};
+
+// Информация о монстре
+const MonsterInfo = ({ monster }) => (
+    <div className="monster-info">
+        <h4>🐉 Монстр</h4>
+        <p>💖 HP: {monster?.getHpString()}</p>
+    </div>
+);
+
+// Панель боевых заклинаний
+const BattleSpellsPanel = ({ spells, actionMappings, canAfford, onUseSpell }) => (
+    <div className="battle-spells">
+        <h4>✨ Боевые заклинания:</h4>
+        {spells.filter(s => s.combat).map((spell) => {
+            const actionKey = Object.keys(actionMappings).find(key => 
+                actionMappings[key].description === `Заклинание: ${spell.name}`
+            );
+            const canUse = canAfford(spell.cost);
+            
+            return (
+                <BattleSpellButton
+                    key={spell.name}
+                    spell={spell}
+                    actionKey={actionKey}
+                    canUse={canUse}
+                    onUseSpell={onUseSpell}
+                />
+            );
+        })}
+    </div>
+);
+
+// Кнопка побега
+const FleeButton = ({ actionMappings, onFlee }) => {
+    const actionKey = Object.keys(actionMappings).find(key => 
+        actionMappings[key].description === 'Сбежать из битвы'
+    );
+    
+    return (
+        <button className="battle-button flee-button" onClick={onFlee}>
+            <span className="hotkey">{actionKey}</span>
+            🏃 Сбежать из битвы
+        </button>
+    );
+};
+
+// Панель битвы
+const BattlePanel = ({ 
+    monster, 
+    spells, 
+    actionMappings, 
+    canAfford, 
+    onUseSpell, 
+    onFlee 
+}) => (
+    <div className="battle-panel">
+        <h2>⚔️ БИТВА С МОНСТРОМ ⚔️</h2>
+        <MonsterInfo monster={monster} />
+        <BattleSpellsPanel 
+            spells={spells}
+            actionMappings={actionMappings}
+            canAfford={canAfford}
+            onUseSpell={onUseSpell}
+        />
+        <FleeButton actionMappings={actionMappings} onFlee={onFlee} />
+    </div>
+);
+
+// Запись в логе
+const LogEntry = ({ entry }) => (
+    <div className={`log-entry log-${entry.type}`}>
+        <span className="log-time">[{entry.time}]</span>
+        <span className="log-message">{entry.message}</span>
+    </div>
+);
+
+// Лог событий
+const GameLog = ({ gameLog }) => (
+    <div className="game-log">
+        <h3>Лог событий</h3>
+        <div className="log-content">
+            {gameLog.slice(0, 10).map((entry) => (
+                <LogEntry key={entry.id} entry={entry} />
+            ))}
+        </div>
+    </div>
+);
+
+// Боковая панель
+const Sidebar = ({ 
+    battleState, 
+    spells, 
+    actionMappings, 
+    canAfford, 
+    onUseSpell, 
+    onFlee,
+    terrainManager,
+    player,
+    onPerformTerrainAction
+}) => (
+    <div className="sidebar">
+        {!battleState.active ? (
+            <>
+                <SpellsPanel 
+                    spells={spells}
+                    actionMappings={actionMappings}
+                    canAfford={canAfford}
+                    onUseSpell={onUseSpell}
+                />
+                <TerrainActionsPanel
+                    terrainManager={terrainManager}
+                    player={player}
+                    actionMappings={actionMappings}
+                    canAfford={canAfford}
+                    onPerformTerrainAction={onPerformTerrainAction}
+                />
+            </>
+        ) : (
+            <BattlePanel
+                monster={battleState.monster}
+                spells={spells}
+                actionMappings={actionMappings}
+                canAfford={canAfford}
+                onUseSpell={onUseSpell}
+                onFlee={onFlee}
+            />
+        )}
+    </div>
+);
 
 // ===== ГЛАВНЫЙ КОМПОНЕНТ ИГРЫ =====
 const RPGGame = () => {
@@ -415,199 +734,34 @@ const RPGGame = () => {
         setActionMappings(newMappings);
     }, [battleState.active, player.x, player.y, useSpell, fleeBattle, performTerrainAction]);
 
-    // Рендер клетки местности
-    const renderTerrainCell = (x, y) => {
-        const terrain = terrainManagerRef.current?.map || [];
-        const surface = terrainManagerRef.current?.getSurface(terrain[y]?.[x]);
-        if (!surface) return null;
-
-        const isPlayerHere = player.x === x && player.y === y;
-        const objectHere = gameObjects.find(obj => obj.x === x && obj.y === y);
-
-        return (
-            <div
-                key={`${x}-${y}`}
-                className="terrain-cell"
-                style={{ backgroundColor: surface.color }}
-                title={`${surface.name} (${x}, ${y})`}
-            >
-                <div className="surface-emoji">{surface.emoji}</div>
-                {isPlayerHere && <div className="player">🧙‍♂️</div>}
-                {objectHere && (
-                    <div className="game-object">
-                        {objectHere.config.emoji}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="rpg-game" ref={gameContainerRef} tabIndex={0}>
-            {/* Ресурсы игрока */}
-            <div className="resources-panel">
-                <h3>Ресурсы:</h3>
-                <div className="resources">
-                    {Object.entries(player.resources).map(([symbol, amount]) => (
-                        <span key={symbol} className="resource">
-                            {symbol} {amount}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
+            <ResourcesPanel resources={player.resources} />
+            
             <div className="game-layout">
-                {/* Игровое поле */}
-                <div className="game-area">
-                    <div className="terrain-grid">
-                        {Array.from({ length: CONFIG.ROWS }, (_, y) => (
-                            <div key={y} className="terrain-row">
-                                {Array.from({ length: CONFIG.COLS }, (_, x) => 
-                                    renderTerrainCell(x, y)
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Боковая панель */}
-                <div className="sidebar">
-                    {!battleState.active ? (
-                        <>
-                            {/* Заклинания */}
-                            <div className="spells-panel">
-                                <h3>Заклинания</h3>
-                                {CONFIG.SPELLS.filter(s => !s.combat).map((spell, index) => {
-                                    const actionKey = Object.keys(actionMappings).find(key => 
-                                        actionMappings[key].description === `Заклинание: ${spell.name}`
-                                    );
-                                    const canUse = canAfford(spell.cost);
-                                    
-                                    return (
-                                        <button
-                                            key={spell.name}
-                                            className={`action-button ${!canUse ? 'disabled' : ''}`}
-                                            onClick={() => useSpell(spell)}
-                                            disabled={!canUse}
-                                        >
-                                            <span className="hotkey">{actionKey}</span>
-                                            <span className="spell-emoji">{spell.emoji}</span>
-                                            <div className="button-content">
-                                                <div className="button-title">{spell.name}</div>
-                                                <div className="button-cost">Стоимость: {formatResources(spell.cost)}</div>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Действия на местности */}
-                            <div className="terrain-actions">
-                                <h3>Действия на местности</h3>
-                                {(() => {
-                                    const terrain = terrainManagerRef.current?.map || [];
-                                    const currentSurface = terrainManagerRef.current?.getSurface(terrain[player.y]?.[player.x]);
-                                    
-                                    if (!currentSurface?.actions?.length) {
-                                        return <p>Нет доступных действий</p>;
-                                    }
-
-                                    return currentSurface.actions.map((action) => {
-                                        const actionKey = Object.keys(actionMappings).find(key => 
-                                            actionMappings[key].description === `Действие: ${action.label}`
-                                        );
-                                        const canUse = canAfford(action.cost);
-                                        
-                                        return (
-                                            <button
-                                                key={action.label}
-                                                className={`action-button ${!canUse ? 'disabled' : ''}`}
-                                                onClick={() => performTerrainAction(action)}
-                                                disabled={!canUse}
-                                            >
-                                                <span className="hotkey">{actionKey}</span>
-                                                <div className="button-content">
-                                                    <div className="button-title">{action.label}</div>
-                                                    <div className="button-cost">
-                                                        {Object.keys(action.cost).length > 0 && 
-                                                            `Стоимость: ${formatResources(action.cost)} → `
-                                                        }
-                                                        Получить: {formatResources(action.gain)}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        );
-                                    });
-                                })()}
-                            </div>
-                        </>
-                    ) : (
-                        /* Панель битвы */
-                        <div className="battle-panel">
-                            <h2>⚔️ БИТВА С МОНСТРОМ ⚔️</h2>
-                            
-                            <div className="monster-info">
-                                <h4>🐉 Монстр</h4>
-                                <p>💖 HP: {battleState.monster?.getHpString()}</p>
-                            </div>
-
-                            <div className="battle-spells">
-                                <h4>✨ Боевые заклинания:</h4>
-                                {CONFIG.SPELLS.filter(s => s.combat).map((spell) => {
-                                    const actionKey = Object.keys(actionMappings).find(key => 
-                                        actionMappings[key].description === `Заклинание: ${spell.name}`
-                                    );
-                                    const canUse = canAfford(spell.cost);
-                                    
-                                    return (
-                                        <button
-                                            key={spell.name}
-                                            className={`battle-button ${!canUse ? 'disabled' : ''}`}
-                                            onClick={() => useSpell(spell)}
-                                            disabled={!canUse}
-                                        >
-                                            <span className="hotkey">{actionKey}</span>
-                                            <span className="spell-emoji">{spell.emoji}</span>
-                                            <div className="button-content">
-                                                <div className="button-title">{spell.name}</div>
-                                                <div className="button-cost">
-                                                    Стоимость: {formatResources(spell.cost)} | 
-                                                    Урон: {formatResources(spell.damage)}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                                
-                                <button className="battle-button flee-button" onClick={fleeBattle}>
-                                    <span className="hotkey">
-                                        {Object.keys(actionMappings).find(key => 
-                                            actionMappings[key].description === 'Сбежать из битвы'
-                                        )}
-                                    </span>
-                                    🏃 Сбежать из битвы
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <GameArea 
+                    rows={CONFIG.ROWS}
+                    cols={CONFIG.COLS}
+                    terrainManager={terrainManagerRef.current}
+                    player={player}
+                    gameObjects={gameObjects}
+                />
+                
+                <Sidebar
+                    battleState={battleState}
+                    spells={CONFIG.SPELLS}
+                    actionMappings={actionMappings}
+                    canAfford={canAfford}
+                    onUseSpell={useSpell}
+                    onFlee={fleeBattle}
+                    terrainManager={terrainManagerRef.current}
+                    player={player}
+                    onPerformTerrainAction={performTerrainAction}
+                />
             </div>
 
-            {/* Лог событий */}
-            <div className="game-log">
-                <h3>Лог событий</h3>
-                <div className="log-content">
-                    {gameLog.slice(0, 10).map((entry) => (
-                        <div key={entry.id} className={`log-entry log-${entry.type}`}>
-                            <span className="log-time">[{entry.time}]</span>
-                            <span className="log-message">{entry.message}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-           
+            <GameLog gameLog={gameLog} />
+   
         </div>
     );
 };
-
