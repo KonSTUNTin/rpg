@@ -1,28 +1,26 @@
-// objectConfigs.js - Конфигурации игровых объектов
-
-export const OBJECT_CONFIGS = [
+const OBJECT_CONFIGS = [
     {
         type: 'monster',
         color: 'purple',
-        sprite: null, // Можно задать путь к спрайту: 'assets/monster.png'
+        emoji: '👹',
         resourceGain: { '♠': 2, '♣': 1 }
     },
     {
         type: 'chest',
         color: 'gold',
-        sprite: './images/chest.png',
+        emoji: '📦',
         resourceGain: { '♦': 3 }
     },
     {
         type: 'artifact',
         color: 'blue',
-        sprite: null,
+        emoji: '🔮',
         resourceGain: { '♠': 1, '♦': 1, '♣': 1 }
     },
     {
         type: 'crystal',
         color: 'cyan',
-        sprite: null,
+        emoji: '💎',
         resourceGain: { '♦': 5 }
     }
 ];
